@@ -10,4 +10,4 @@ Current approach:
 3. Testing mid-size open reasoning LLMs on the benchmark
 
 Current conclusion:
-It is too easy. The alternative answers are usually too obviously wrong.  
+It is too easy. Wrong answers are usually too obviously wrong.  
