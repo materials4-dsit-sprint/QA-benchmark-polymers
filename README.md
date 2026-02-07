@@ -9,3 +9,5 @@ Current approach:
 2. Polymer expert review of the questions
 3. Testing mid-size open reasoning LLMs on the benchmark
 
+Current conclusion:
+It is too easy. The alternative answers are usually too obviously wrong.  
