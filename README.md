@@ -1,13 +1,6 @@
-# QA-benchmark-polymers
+# QA polymer dataset generation
 
-Experimentation stage... 
+This repository contains different attempts to generate QA polymer datasets form literature:
+1. Questions with multiple choice answeres generated with gpt-5.2 from selection of polymer reviews
+2. Squad 2.0 style QA pairs genearted from the same reviews with qwen3-8b
 
-QA dataset for benchmarking LLMs with respect to their abilities to answer polymer science questions.
-
-Current approach:
-1. Generate QA (multiple choice) pairs from pre-selected literature
-2. Polymer expert review of the questions
-3. Testing mid-size open reasoning LLMs on the benchmark
-
-Current conclusion:
-It is too easy. Wrong answers are usually too obviously wrong.  
