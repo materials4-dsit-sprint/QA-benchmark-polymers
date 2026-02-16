@@ -1,14 +1,3 @@
-# Copyright 2024
-# Georgia Tech Research Corporation
-# All Rights Reserved
-#
-# Licensed under the GTRC General Public Use License
-#
-# MODIFIED FROM ORIGINAL VERSION
-# Date: 2026-02-16
-# Changes: Added CSMarkdownParser
-
-
 import re
 from .document import DocumentParser, XMLDocumentParser
 

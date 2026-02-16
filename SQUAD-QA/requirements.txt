@@ -1,4 +1,0 @@
-# For QA generation pipeline (Test.ipynb)
-ollama>=0.3.0
-openai>=1.0.0  # optional: for ChatGPT-4o backend (set OPENAI_API_KEY)
-lxml  # required by parsers

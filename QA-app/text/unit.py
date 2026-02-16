@@ -3,6 +3,10 @@
 # All Rights Reserved
 #
 # Licensed under the GTRC General Public Use License
+#
+# MODIFIED FROM ORIGINAL VERSION
+# Date: 2026-02-16
+
 
 """
 Module for unit normalization.
