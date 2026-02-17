@@ -20,8 +20,10 @@ from chunker import chunk_markdown
 # Parser options for PDF/markdown origin
 PARSER_OPTIONS = {"ACS": "acs", "Generic": "generic"}
 
-# Macdown/PDF artifact: /uniXXXX -> Unicode (e.g. /uniFB00 -> ﬀ, /uniFB01 -> ﬁ)
+# Macdown/PDF artifact: /uniXXXX → Unicode (e.g. /uniFB00 → ﬀ)
 _UNICODE_PLACEHOLDER = re.compile(r" ?/uni([0-9A-Fa-f]{4}) ?")
+_DOI_PATTERN = re.compile(r"10\.\d{4,}/[^\s]+")
+_DOI_LINE_PATTERN = re.compile(r"DOI:\s*(10\.\d{4,}/[^\s]+)", re.I)
 
 
 def _decode_unicode_placeholders(text: str) -> str:
@@ -40,6 +42,15 @@ EXCLUDED_SECTION_KEYWORDS = (
     "FIGURE", "TABLE",  # Figure/table captions, "Figures and Tables" chunk
     "PREAMBLE",
 )
+
+
+def _extract_doi_from_text(text: str) -> str:
+    """Extract DOI from text (e.g. 'DOI: 10.1021/...' or inline 10.1021/...)."""
+    m = _DOI_LINE_PATTERN.search(text)
+    if m:
+        return m.group(1).rstrip(".,;")
+    m = _DOI_PATTERN.search(text)
+    return m.group(0).rstrip(".,;") if m else ""
 
 
 def _normalize_section(name: str) -> str:
@@ -72,24 +83,33 @@ def _build_answers(context: str, answer_text: str, is_impossible: bool) -> list[
     return [{"text": answer_text, "answer_start": start}]
 
 
-def _pdf_to_markdown_via_docling(uploaded_file) -> str:
-    """Convert PDF to markdown using docling."""
-    from docling.document_converter import DocumentConverter
+def _pdf_to_markdown_via_docling(uploaded_file, extract_formulas: bool = True) -> str:
+    """Convert PDF to markdown using docling. Optionally extract formulas as LaTeX."""
+    from docling.document_converter import DocumentConverter, PdfFormatOption
+    from docling.datamodel.base_models import InputFormat
+    from docling.datamodel.pipeline_options import PdfPipelineOptions
 
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
         tmp.write(uploaded_file.read())
         tmp_path = tmp.name
     try:
-        converter = DocumentConverter()
+        if extract_formulas:
+            pipeline_options = PdfPipelineOptions(do_formula_enrichment=True)
+            converter = DocumentConverter(
+                format_options={
+                    InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options),
+                }
+            )
+        else:
+            converter = DocumentConverter()
         result = converter.convert(tmp_path)
         return result.document.export_to_markdown()
     finally:
         Path(tmp_path).unlink(missing_ok=True)
 
 
-def _get_chunks_via_acs_parser(filepath: str):
-    """Use ACSMarkdownParser for ACS-formatted markdown (file path required)."""
-    # Stub pylogg if not installed (optional dep from parent project)
+def _get_chunks_via_acs_parser(filepath: str) -> tuple:
+    """Use ACSMarkdownParser for ACS-formatted markdown. Returns (chunks, doi)."""
     import sys
     if "pylogg" not in sys.modules:
         try:
@@ -101,7 +121,7 @@ def _get_chunks_via_acs_parser(filepath: str):
 
     parser = ACSMarkdownParser(filepath)
     parser.parse_meta()
-    return parser.get_chunks()
+    return parser.get_chunks(), parser.doi or ""
 
 
 def _get_chunks_from_markdown(markdown: str):
@@ -109,16 +129,19 @@ def _get_chunks_from_markdown(markdown: str):
     return chunk_markdown(markdown)
 
 
-def extract_chunks(uploaded_file, parser: str = "acs") -> list[tuple[str, str]]:
+def extract_chunks(
+    uploaded_file, parser: str = "acs", extract_formulas: bool = True
+) -> tuple[list[tuple[str, str]], str]:
     """
     Parse uploaded file (PDF or Markdown) using docling and parser.
-    Returns list of (section, paragraph) tuples.
+    Returns (chunks, doi) where chunks is list of (section, paragraph) tuples.
     Includes all sections except: References, Figures/Tables, Preamble.
 
     parser: "acs" (ACSMarkdownParser) or "generic" (chunk_markdown only)
     """
     name = uploaded_file.name.lower()
     use_acs = parser == "acs"
+    doi = ""
 
     if name.endswith(".md") or name.endswith(".markdown"):
         with tempfile.NamedTemporaryFile(
@@ -129,21 +152,24 @@ def extract_chunks(uploaded_file, parser: str = "acs") -> list[tuple[str, str]]:
         try:
             if use_acs:
                 try:
-                    chunks = _get_chunks_via_acs_parser(tmp_path)
+                    chunks, doi = _get_chunks_via_acs_parser(tmp_path)
                 except Exception:
                     with open(tmp_path, "r", encoding="utf-8", errors="replace") as f:
                         content = f.read()
                     chunks = _get_chunks_from_markdown(content)
+                    doi = _extract_doi_from_text(content)
             else:
                 with open(tmp_path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read()
                 chunks = _get_chunks_from_markdown(content)
+                doi = _extract_doi_from_text(content)
         finally:
             Path(tmp_path).unlink(missing_ok=True)
     else:
         # PDF: docling → markdown → chunker
-        markdown = _pdf_to_markdown_via_docling(uploaded_file)
+        markdown = _pdf_to_markdown_via_docling(uploaded_file, extract_formulas=extract_formulas)
         chunks = _get_chunks_from_markdown(markdown)
+        doi = _extract_doi_from_text(markdown)
 
     def _section_excluded(norm: str) -> bool:
         """True if section should be excluded (references, figures, preamble)."""
@@ -185,7 +211,7 @@ def extract_chunks(uploaded_file, parser: str = "acs") -> list[tuple[str, str]]:
                     para_clean = _decode_unicode_placeholders(para)
                     result.append((section_clean, para_clean))
 
-    return result
+    return result, doi
 
 
 def main():
@@ -218,6 +244,11 @@ def main():
         help="ACS: for American Chemical Society papers. Generic: for other sources.",
     )
     parser_value = PARSER_OPTIONS[parser]
+    extract_formulas = st.sidebar.checkbox(
+        "Extract formulas as LaTeX (PDF)",
+        value=True,
+        help="Uses Docling formula enrichment to convert equations to LaTeX (e.g. $x^2$). Increases PDF processing time.",
+    )
 
     uploaded = st.file_uploader("Upload PDF or Markdown", type=["pdf", "md", "markdown"])
     if not uploaded:
@@ -226,10 +257,15 @@ def main():
             _render_export_section()
         return
 
-    # Cache parsed chunks by file identity and parser
-    cache_key = f"{uploaded.name}_{uploaded.size}_{parser_value}"
+    # Cache parsed chunks by file identity, parser, and options
+    cache_key = f"{uploaded.name}_{uploaded.size}_{parser_value}_{extract_formulas}"
     if getattr(st.session_state, "parse_cache_key", None) != cache_key:
-        st.session_state.chunks_cache = extract_chunks(uploaded, parser=parser_value)
+        chunks_list, document_doi = extract_chunks(
+            uploaded, parser=parser_value, extract_formulas=extract_formulas
+        )
+        st.session_state.chunks_cache = chunks_list
+        st.session_state.document_doi = document_doi
+        st.session_state.source_filename = uploaded.name
         st.session_state.parse_cache_key = cache_key
         st.session_state.triples = []
         st.session_state.id_map = {}
@@ -242,8 +278,10 @@ def main():
     contexts_with_qa = {t["context"] for t in st.session_state.triples}
     st.sidebar.success(f"Parsed {n_total} chunks")
     n_questions = len(st.session_state.triples)
+    n_impossible = sum(1 for t in st.session_state.triples if t.get("is_impossible"))
     n_paras_left = n_total - n_skipped - len(contexts_with_qa)
     st.sidebar.metric("Questions", n_questions)
+    st.sidebar.metric("Impossible questions", n_impossible)
     st.sidebar.metric("Paragraphs without QA", n_paras_left)
     if n_skipped > 0:
         if st.sidebar.button("Clear skipped paragraphs"):
@@ -268,9 +306,10 @@ def main():
 
     # Build triples from form state this run
     # Preserve triples from filtered-out paragraphs when "Show only without QA" is on
+    doc_doi = st.session_state.get("document_doi", "")
     if filter_incomplete:
         hidden_contexts = {chunks[j][1] for j in range(len(chunks)) if j not in st.session_state.skipped_paras and chunks[j][1] in contexts_with_qa}
-        preserved = [t for t in st.session_state.triples if t["context"] in hidden_contexts]
+        preserved = [{**t, "doi": doc_doi} for t in st.session_state.triples if t["context"] in hidden_contexts]
     else:
         preserved = []
     new_triples = list(preserved)
@@ -347,6 +386,7 @@ def main():
                     }
                     if section and "DOCUMENT" not in _normalize_section(section):
                         triple["section"] = safe_sec
+                    triple["doi"] = doc_doi
                     new_triples.append(triple)
 
             cols = st.columns([1, 1, 4])
@@ -370,10 +410,12 @@ def _render_export_section():
     triples_list = st.session_state.triples
     if triples_list:
         json_str = json.dumps(triples_list, indent=2)
+        base = Path(st.session_state.get("source_filename", "qa_triples")).stem
+        download_name = f"{base}.json"
         st.download_button(
             "Download as JSON",
             data=json_str,
-            file_name="qa_triples.json",
+            file_name=download_name,
             mime="application/json",
         )
         with st.expander("Preview (SQuAD format: is_impossible, answers)"):

@@ -1,3 +1,12 @@
+# Copyright 2024
+# Georgia Tech Research Corporation
+# All Rights Reserved
+#
+# Licensed under the GTRC General Public Use License
+#
+# MODIFIED FROM ORIGINAL VERSION
+# Date: 2026-02-16
+
 import re
 import json
 from datetime import datetime
