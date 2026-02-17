@@ -1,5 +1,7 @@
 # PDF QA Builder
 
+*This app was generated with Composer 1.5 Agent entirely through prompts from some minimal seed code*
+
 A Streamlit app to build SQuAD-style QA datasets from PDF documents. Upload a PDF, parse into paragraphs, add Q&A pairs (including unanswerable questions), and export to JSON.
 
 ## Features
