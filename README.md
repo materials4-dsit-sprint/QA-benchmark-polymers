@@ -6,7 +6,7 @@
   
 2. SQuAD2.0-style dataset for extractive question answering
 
-  This dataset was algorithmically generated from the data extracted from [1]. It contains ... QA pairs with approximately 20% of impossible questions.
+  This dataset was algorithmically generated from the data extracted from [1]. It contains 7643 QA pairs with approximately 20% of impossible questions (80:10:10 train:test:val split).
 
 
 ## References
