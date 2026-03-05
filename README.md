@@ -1,6 +1,14 @@
-# QA polymer dataset generation
+# QA polymer datasets
 
-This repository contains different attempts to generate QA polymer datasets form literature:
-1. Questions with multiple choice answeres generated with gpt-5.2 from selection of polymer reviews
-2. Squad 2.0 style QA pairs genearted from the same reviews with qwen3-8b
+1. Multiple-choice question answering dataset
+
+  This dataset was generated with GPT-5.2 from the set of manually selected polymer reviews. Generated QA pairs were reviewed by a human expert. Final dataset contains 241 questions.
+  
+2. SQuAD2.0-style dataset for extractive question answering
+
+  This dataset was algorithmically generated from the data extracted from [1]. It contains 7643 QA pairs with approximately 20% of impossible questions (80:10:10 train:test:val split).
+
+
+## References
+1. "High-throughput experimentation for discovery of biodegradable polyesters", Fransena, K. A., Av-Rona, S. H. M. , Buchanana, T. R. , Walsha, D. J. , Rotaa, D. T., Van Notea, L., and Olsen, B. D., PNAS, 120 (23) e2220021120, 2023, https://doi.org/10.1073/pnas.2220021120.
 
